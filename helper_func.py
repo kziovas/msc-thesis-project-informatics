@@ -1,13 +1,22 @@
+import time
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import MinMaxScaler,StandardScaler
+from sklearn.metrics import accuracy_score,top_k_accuracy_score, mean_squared_error, mean_absolute_error
+from multiprocessing import Pool
+from functools import partial
+from sklearn.multioutput import MultiOutputRegressor
+from sklearn.neural_network import MLPRegressor
 
 def prediction_plot(real_val,predic_val,ax_lim_low,ax_lim_high,majr_tick,mnr_tick,ax_label):
     #Plot estiamted vs real values
-    df_diam = pd.DataFrame({'actual':real_val, 'predicted':predic_val})
+    df= pd.DataFrame({'actual':real_val, 'predicted':predic_val})
 
     sns.set_style("ticks", {"xtick.major.size": 200, "ytick.major.size": 1})
 
@@ -34,7 +43,7 @@ def prediction_plot(real_val,predic_val,ax_lim_low,ax_lim_high,majr_tick,mnr_tic
     plt.yticks(fontsize=14)
 
     #Create actual seborn graph
-    graph=sns.regplot(data=df_diam, x="actual", y="predicted",ci=95,x_bins=40, scatter_kws={"color": "black",'s':50},line_kws={"color": "black"})#, fit_reg=False
+    graph=sns.regplot(data=df, x="actual", y="predicted",ci=95,x_bins=40, scatter_kws={"color": "black",'s':50},line_kws={"color": "black"})#, fit_reg=False
 
     # control x and y limits
     plt.ylim(ax_lim_low, ax_lim_high)
@@ -69,3 +78,74 @@ def prediction_plot(real_val,predic_val,ax_lim_low,ax_lim_high,majr_tick,mnr_tic
     secax2.yaxis.set_major_locator(MultipleLocator(majr_tick))
     secax2.yaxis.set_minor_locator(MultipleLocator(mnr_tick))
     secax2.set_yticklabels([]);
+    
+    #Find data length in order to create dummy data for diagonal "ideal" line
+    df_length=len(df)
+    df_diag = pd.DataFrame({ 'x_diag' : np.arange(ax_lim_low,ax_lim_high + majr_tick ,majr_tick),
+    'y_diag' : np.arange(ax_lim_low,ax_lim_high + majr_tick ,majr_tick) })
+    
+    diag=sns.lineplot(data=df_diag, x="x_diag", y="y_diag", color='grey',linestyle='--')
+    
+def data_prep(df):
+    #Split label from features
+    X = df.drop(['mean','sd'],axis=1)
+    y = df[['mean','sd']]
+    #Split train and test data
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=101)
+    #Scale data
+    scaler = MinMaxScaler()#StandardScaler()#
+    scaled_X_train = scaler.fit_transform(X_train)
+    scaled_X_test = scaler.transform(X_test)
+    
+    return (df,X,y, X_train, X_test, y_train, y_test,scaled_X_train,scaled_X_test)
+
+def model_eval(model,scaled_X_train,y_train,scaled_X_test,y_test):
+    #Fit model
+    fit_start = time.time()
+    model.fit(scaled_X_train,y_train)
+    fit_end = time.time()
+    fit_time=fit_end-fit_start
+    
+    #Predict results
+    pred_start = time.time()
+    y_pred=model.predict(scaled_X_test)
+    pred_end = time.time()
+    pred_time=pred_end-pred_start
+    
+    # Evaluate the regressor
+    mse_one = mean_squared_error(y_test['mean'], y_pred[:,0])
+    mse_two = mean_squared_error(y_test['sd'], y_pred[:,1])
+
+    mae_one = mean_absolute_error(y_test['mean'], y_pred[:,0])
+    mae_two = mean_absolute_error(y_test['sd'], y_pred[:,1])
+    
+    return(fit_time,pred_time,mse_one,mse_two,mae_one,mae_two)
+
+def analysis_func_expnum(exp,model,noise):
+    csv_path=f"./data/train_data{exp}_noise{noise}.csv"
+    df= pd.read_csv(csv_path,index_col=0)
+    #Data preparation step
+    df,X,y, X_train, X_test, y_train, y_test,scaled_X_train,scaled_X_test=data_prep(df)
+    fit_time,pred_time,mse_one,mse_two,mae_one,mae_two=model_eval(model,scaled_X_train,y_train,scaled_X_test,y_test)
+    results=(exp, fit_time,pred_time,mse_one,mse_two,mae_one,mae_two)
+    return (results)
+
+def analysis_func_layers(layers,num_exprs,noise):
+    
+    #Define final MLP
+    model_single = MLPRegressor(random_state=1, max_iter=500,tol=0.001,early_stopping=True,activation='relu',alpha=0.000075,
+                   hidden_layer_sizes=layers,solver='adam',beta_1=0.5,beta_2=0.05,learning_rate='constant')
+    model = MultiOutputRegressor(model_single)
+    results=list(analysis_func_expnum(num_exprs,model,noise))
+    results[0]=layers
+    results=tuple(results)
+    return  results
+
+def analysis_func_noise(noise,exp,model):
+    csv_path=f"./data/train_data{exp}_noise{noise}.csv"
+    df= pd.read_csv(csv_path,index_col=0)
+    #Data preparation step
+    df,X,y, X_train, X_test, y_train, y_test,scaled_X_train,scaled_X_test=data_prep(df)
+    fit_time,pred_time,mse_one,mse_two,mae_one,mae_two=model_eval(model,scaled_X_train,y_train,scaled_X_test,y_test)
+    results=(noise, fit_time,pred_time,mse_one,mse_two,mae_one,mae_two)
+    return (results)
