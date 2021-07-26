@@ -265,3 +265,37 @@ def sim_df_rand_sizes(noise,diam_min,diam_max,sd_min,sd_max,sphere_num,numexpr,d
     #return df
 
     
+def real_space_profile(diam,sd,sphere_num,dim=256):
+    """This functions creates a 1D real space profile of specified sphere(s)
+
+    Args:
+        diam : float
+            Mean sphere diameter
+        sd: float
+            Standard deviation of diamteres as a fraction of mean diameter 
+        sphere_num: int
+            The number of spheres simumated per simulated experiment(If -1 is given
+            a random number is chosen each time)
+          
+    Returns:
+        A pandas dataframe with the simulated data and with headers.
+
+    """
+
+    rad=diam/2
+    sd_perc=sd
+    sd = sd *diam
+
+    FoV= np.zeros(dim, dtype=np.single)
+    x=np.arange((-dim/2),dim/2,1,dtype=np.single)
+    for i in range(sphere_num):
+        radius = float(np.random.normal(rad, sd)) #In each sample each sphere is drown from the a normal distribution with the cpecified parameters.
+        radius_sq=radius**2
+        projection1d=3.14*(radius_sq-np.power(x, 2))
+        projection1d=np.where(projection1d<=0,0,projection1d)
+        shift=random.randint(-dim/2,dim/2)
+        nbubble=np.roll(projection1d, shift)
+        FoV=FoV+nbubble
+    x=np.arange(0,dim,1,dtype=np.single)
+    df=pd.DataFrame({'signal':FoV,'space':x})
+    return df

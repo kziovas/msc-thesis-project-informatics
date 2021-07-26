@@ -3,8 +3,6 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import MinMaxScaler,StandardScaler
@@ -113,11 +111,11 @@ def model_eval(model,scaled_X_train,y_train,scaled_X_test,y_test):
     pred_time=pred_end-pred_start
     
     # Evaluate the regressor
-    mse_one = mean_squared_error(y_test['mean'], y_pred[:,0])
-    mse_two = mean_squared_error(y_test['sd'], y_pred[:,1])
+    mse_one = mean_squared_error((y_test['mean']-1)/10, (y_pred[:,0]-1)/10)
+    mse_two = mean_squared_error(y_test['sd']*4, y_pred[:,1]*4)
 
-    mae_one = mean_absolute_error(y_test['mean'], y_pred[:,0])
-    mae_two = mean_absolute_error(y_test['sd'], y_pred[:,1])
+    mae_one = mean_absolute_error((y_test['mean']-1)/10, (y_pred[:,0]-1)/10)
+    mae_two = mean_absolute_error(y_test['sd']*4, y_pred[:,1]*4)
     
     return(fit_time,pred_time,mse_one,mse_two,mae_one,mae_two)
 
@@ -149,3 +147,38 @@ def analysis_func_noise(noise,exp,model):
     fit_time,pred_time,mse_one,mse_two,mae_one,mae_two=model_eval(model,scaled_X_train,y_train,scaled_X_test,y_test)
     results=(noise, fit_time,pred_time,mse_one,mse_two,mae_one,mae_two)
     return (results)
+
+def perform_plot(df):
+    sns.set(font_scale = 2)
+    
+    y_vars = df.columns[1:]
+    x_vars = df.columns[0]
+    for y_var in y_vars:
+        sns.set_style("ticks", {"xtick.major.size": 200, "ytick.major.size": 1})
+        
+
+        
+        fig, ax = plt.subplots(figsize=(12,8))
+        sns.lineplot(data=df,x=df[x_vars],y=df[y_var],color = 'black',palette=['black'])
+        
+        #Move tickmarks inside of the plot
+        ax.tick_params(axis="both",direction="in",which="both", pad=10, colors='black')
+        
+        ax.spines['bottom'].set_color('black')
+        ax.spines['top'].set_color('black') 
+        ax.spines['right'].set_color('black')
+        ax.spines['left'].set_color('black')
+
+        ax.yaxis.label.set_color('black')
+        ax.xaxis.label.set_color('black')
+        
+        #specify secondary axis similar to primary repeat all that we did above
+        #Xaxis first
+        secax = ax.secondary_xaxis('top')
+        secax.tick_params(axis="both",direction="in",which="both", pad=10, colors='black')
+        secax.set_xticklabels([]);
+
+        #Yaxis second
+        secax2 = ax.secondary_yaxis('right')
+        secax2.tick_params(axis="both",direction="in",which="both", pad=10, colors='black')
+        secax2.set_yticklabels([]);
