@@ -1,4 +1,4 @@
-# UniOfPiraeusMScThesisProject
+# MSc-Thesis-Project-Informatics
 
 This is my thesis project for my conversion MSc course in Informatics at Uni. of Piraeus 2021.
 
